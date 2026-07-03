@@ -8,4 +8,4 @@ mkdir -p /data/.hermes/pairing
 
 cd /data/.hermes/workspace
 
-exec hermes gateway run console
+exec hermes gateway run
