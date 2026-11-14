@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates git ffmpeg tini && \
@@ -16,9 +16,20 @@ RUN apt-get update && \
 
 RUN node --version && npm --version
 
-RUN git clone --depth 1 https://github.com/NousResearch/hermes-agent.git /tmp/hermes-agent && \
+# Pin to hermes-agent HEAD at the last successful pre-crash Railway image
+# (deployment f0af1296, 2026-07-03T16:29:54Z). Build logs have expired; this
+# is origin/main at that timestamp (next upstream commit landed at 16:44Z).
+# That tree requires Python <3.14 and ships Telegram via the messaging extra
+# (lazy-installed at runtime on the old image). Install it at build time so
+# the adapter is present on first boot and future rebuilds cannot drift.
+ARG HERMES_AGENT_SHA=a6b9597d5fb92969d605a858d5f14536e805553a
+RUN git init /tmp/hermes-agent && \
     cd /tmp/hermes-agent && \
-    uv pip install --system --no-cache -e ".[all]" && \
+    git remote add origin https://github.com/NousResearch/hermes-agent.git && \
+    git fetch --depth 1 origin ${HERMES_AGENT_SHA} && \
+    git checkout --detach FETCH_HEAD && \
+    git rev-parse HEAD && \
+    uv pip install --system --no-cache -e ".[all,messaging]" && \
     rm -rf /tmp/hermes-agent/.git
 
 COPY requirements.txt /app/requirements.txt
